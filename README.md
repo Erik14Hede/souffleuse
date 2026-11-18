@@ -44,7 +44,7 @@ Danach wie oben unter **Settings → Pages** den Branch `main` freigeben.
 
 ### Stücke auf ein anderes Gerät übertragen
 
-Alles wird nur im Browser gespeichert, in dem es angelegt wurde. Zum Übertragen in den **Einstellungen → Speicher → Alle Stücke sichern** tippen, die Datei `souffleuse-sicherung-….json` aufs andere Gerät schicken (Mail, Messenger, AirDrop, Cloud) und dort unter **Einstellungen → Sicherung laden** auswählen. Die Sicherung enthält Skripte, Rollenwahl, Stimmenzuordnung und die Chatbot-Antworten. Nicht enthalten sind die Einstellungen (z. B. der Gemini-Schlüssel) und heruntergeladene Offline-KI-Stimmen. Handy-Stimmen ordnet die App auf dem neuen Gerät automatisch neu zu.
+Alles wird nur im Browser gespeichert, in dem es angelegt wurde. Zum Übertragen in den **Einstellungen → Speicher → Alle Stücke sichern** tippen, die Datei `souffleuse-sicherung-….json` aufs andere Gerät schicken (Mail, Messenger, AirDrop, Cloud) und dort unter **Einstellungen → Sicherung laden** auswählen. Die Sicherung enthält Skripte, Rollenwahl, Stimmenzuordnung und die Chatbot-Antworten. Nicht enthalten sind die Einstellungen (z. B. der Gemini-Schlüssel) und heruntergeladene Offline-KI-Stimmen. Wer schon Gemini-Zeilen erzeugt hat, kann stattdessen **„Mit Gemini-Audios sichern“** wählen: Dann kommen die fertigen Audios mit (Datei `….souffleuse`, ca. 3 MB pro Minute) und müssen auf dem neuen Gerät nicht noch einmal bei Google angefragt werden. Handy-Stimmen ordnet die App auf dem neuen Gerät automatisch neu zu.
 
 Auf dem iPhone hat die App auf dem Home-Bildschirm einen eigenen Speicher. Deshalb zuerst zum Home-Bildschirm hinzufügen, die App von dort öffnen und die Sicherung dort laden.
 

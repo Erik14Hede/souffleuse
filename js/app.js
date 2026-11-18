@@ -10,9 +10,10 @@ import { voiceOptions, autoAssign, assignment, NARRATOR } from './cast.js';
 import { Player, MODES, DEFAULT_PLAY, renderScene, missingClips, unlockAudio, ClipProvider, getAudioEl } from './player.js';
 import { DEMO_TITLE, DEMO_SCRIPT } from './demo.js';
 import { MASTER_RATE, wavBlob } from './audio.js';
+import { buildBackup, readBackup } from './backup.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.6';
+const APP_VERSION = '1.0.7';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
@@ -1069,6 +1070,9 @@ async function showSettings() {
             <button class="btn secondary" data-action="exportAll">${icon.download} Alle Stücke sichern</button>
             <label class="btn secondary" style="position:relative">Sicherung laden<input type="file" data-change="importAll" style="position:absolute;inset:0;opacity:0"></label>
           </div>
+          ${clipInfo.geminiN ? `<div class="btn-row"><button class="btn secondary" data-action="exportAudio">${icon.download} Mit Gemini-Audios sichern (${fmtBytes(clipInfo.geminiBytes)})</button></div>
+          <p class="hint">Nimmt die schon erzeugten Gemini-Zeilen mit, damit sie auf dem anderen Gerät nicht neu angefragt werden müssen. Die Datei wird entsprechend groß.</p>` : ''}
+          <p class="hint" id="backupState" aria-live="polite"></p>
         </section>
 
         <section class="section">
@@ -1083,14 +1087,21 @@ async function showSettings() {
       piperBase: (el) => { s.piperBaseUrl = el.value.trim() || 'https://huggingface.co/rhasspy/piper-voices/resolve/main/'; setPiperBase(s.piperBaseUrl); saveSettings(s); },
       importAll: async (el) => {
         const f = el.files && el.files[0]; if (!f) return;
-        let data = null;
-        try { data = JSON.parse(await f.text()); } catch (e) { /* keine JSON-Datei */ }
-        if (!data || data.app !== 'souffleuse' || !Array.isArray(data.projects)) throw new Error('Das ist keine Souffleuse-Sicherung.');
-        for (const pr of data.projects) {
+        const state = document.getElementById('backupState');
+        const show = (t) => { if (state) state.textContent = t; };
+        show('Sicherung wird gelesen …');
+        let r;
+        try {
+          r = await readBackup(f, (x) => show(`Audios werden übernommen … ${Math.round(x * 100)} %`));
+        } catch (e) { show(''); el.value = ''; throw e; }
+        for (const pr of r.projects) {
           if (pr.scriptText) { pr.parsed = parseScript(pr.scriptText); pr.parsedWith = PARSER_VERSION; }
           await projects.put(pr);
         }
-        toast(`${plural(data.projects.length, 'Stück', 'Stücke')} geladen.`);
+        S.project = null;
+        let msg = `${plural(r.projects.length, 'Stück', 'Stücke')} geladen`;
+        if (r.clipsTotal) msg += r.error ? `, ${fmtNumber(r.clipsSaved)} von ${fmtNumber(r.clipsTotal)} Audios (Speicher voll)` : `, dazu ${plural(r.clipsSaved, 'Audio', 'Audios')}`;
+        toast(msg + '.', r.error ? { error: true } : undefined);
         go('#/');
       },
     },
@@ -1124,9 +1135,17 @@ async function showSettings() {
         await clips.clear(); toast('Gelöscht.'); showSettings();
       },
       exportAll: async () => {
-        const all = await projects.all();
-        const day = new Date().toISOString().slice(0, 10);
-        download(new Blob([JSON.stringify({ app: 'souffleuse', version: 1, projects: all.map(stripProject) })], { type: 'application/json' }), `souffleuse-sicherung-${day}.json`);
+        const b = await buildBackup();
+        download(b.blob, b.name);
+      },
+      exportAudio: async (el) => {
+        const state = document.getElementById('backupState');
+        el.disabled = true; if (state) state.textContent = 'Sicherung mit Audios wird erstellt …';
+        try {
+          const b = await buildBackup({ withAudio: true });
+          download(b.blob, b.name);
+          if (state) state.textContent = `Fertig: ${plural(b.clips, 'Audio', 'Audios')}, ${fmtBytes(b.blob.size)}.`;
+        } finally { el.disabled = false; }
       },
     },
   });
@@ -1153,7 +1172,7 @@ function showHelp() {
         <section class="section"><h2>Unterwegs hören</h2>
           <p class="lede">Mit Offline-KI oder Gemini kannst du eine Szene als MP3 speichern. Die läuft auch bei gesperrtem Bildschirm – in jeder Musik- oder Podcast-App.</p></section>
         <section class="section"><h2>Auf ein anderes Gerät übertragen</h2>
-          <p class="lede">Alles wird nur im Browser gespeichert, in dem du es angelegt hast. Zum Übertragen: Einstellungen → „Alle Stücke sichern“. Die Datei schickst du dir aufs Handy und lädst sie dort unter Einstellungen → „Sicherung laden“. Auf dem iPhone die App vorher zum Home-Bildschirm hinzufügen und die Sicherung dort laden, weil die Home-Bildschirm-App einen eigenen Speicher hat.</p></section>
+          <p class="lede">Alles wird nur im Browser gespeichert, in dem du es angelegt hast. Zum Übertragen: Einstellungen → „Alle Stücke sichern“. Die Datei schickst du dir aufs Handy und lädst sie dort unter Einstellungen → „Sicherung laden“. Mit „Mit Gemini-Audios sichern“ kommen auch die schon erzeugten Gemini-Zeilen mit. Auf dem iPhone die App vorher zum Home-Bildschirm hinzufügen und die Sicherung dort laden, weil die Home-Bildschirm-App einen eigenen Speicher hat.</p></section>
         <section class="section"><h2>Tipps</h2>
           <p class="lede">Erkennt die App Namen nicht richtig? Unter „Skript“ kannst du alles korrigieren: eine Zeile pro Replik im Muster <span class="kbd">NAME: Text</span>. Auf dem iPhone klingen die Offline-KI- oder Gemini-Stimmen deutlich natürlicher als die eingebauten.</p></section>
       </div>`,

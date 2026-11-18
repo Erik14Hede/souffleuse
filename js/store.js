@@ -51,13 +51,32 @@ export const clips = {
   async count() { return tx('clips', 'readonly', s => req2p(s.count())); },
   clear() { return tx('clips', 'readwrite', s => req2p(s.clear())); },
   async sizeEstimate() {
-    let bytes = 0, n = 0;
+    let bytes = 0, n = 0, geminiBytes = 0, geminiN = 0;
     await tx('clips', 'readonly', s => new Promise((resolve, reject) => {
       const r = s.openCursor();
-      r.onsuccess = () => { const c = r.result; if (!c) return resolve(); n++; const v = c.value; bytes += (v && v.pcm && v.pcm.byteLength) || 0; c.continue(); };
+      r.onsuccess = () => {
+        const c = r.result; if (!c) return resolve();
+        const b = (c.value && c.value.pcm && c.value.pcm.byteLength) || 0;
+        n++; bytes += b;
+        if (String(c.key).startsWith('g|')) { geminiN++; geminiBytes += b; }
+        c.continue();
+      };
       r.onerror = () => reject(r.error);
     }));
-    return { bytes, n };
+    return { bytes, n, geminiBytes, geminiN };
+  },
+  // alle Einträge, deren Schlüssel mit prefix beginnt (z. B. 'g|' = Gemini)
+  async allWithPrefix(prefix) {
+    const out = [];
+    await tx('clips', 'readonly', s => new Promise((resolve, reject) => {
+      const r = s.openCursor(IDBKeyRange.bound(prefix, prefix + '\uffff'));
+      r.onsuccess = () => { const c = r.result; if (!c) return resolve(); out.push([c.key, c.value]); c.continue(); };
+      r.onerror = () => reject(r.error);
+    }));
+    return out;
+  },
+  putMany(entries) {
+    return tx('clips', 'readwrite', s => Promise.all(entries.map(([k, v]) => req2p(s.put(v, k)))));
   },
 };
 

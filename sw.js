@@ -1,12 +1,12 @@
 /* Souffleuse – Service Worker: App offline verfügbar machen */
-const VERSION = '1.0.6';
+const VERSION = '1.0.7';
 const APP_CACHE = 'souffleuse-app-' + VERSION;
 const LIB_CACHE = 'souffleuse-lib-v1';
 
 const CORE = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/ui.js', 'js/store.js', 'js/format.js', 'js/importers.js', 'js/ai.js', 'js/audio.js',
-  'js/emotion.js', 'js/cast.js', 'js/player.js', 'js/demo.js',
+  'js/emotion.js', 'js/cast.js', 'js/player.js', 'js/demo.js', 'js/backup.js',
   'js/engines/device.js', 'js/engines/piper.js', 'js/engines/piper-worker.js', 'js/engines/gemini.js',
   'fonts/literata-latin-opsz-normal.woff2', 'fonts/literata-latin-opsz-italic.woff2',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/apple-touch-icon.png',
