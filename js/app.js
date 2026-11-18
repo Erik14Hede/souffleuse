@@ -12,7 +12,7 @@ import { DEMO_TITLE, DEMO_SCRIPT } from './demo.js';
 import { MASTER_RATE, wavBlob } from './audio.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.5';
+const APP_VERSION = '1.0.6';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
@@ -728,8 +728,12 @@ async function showPlayer(id, sid) {
 
   async function prepareCast() {
     const eng = p.engine;
-    if (!p.cast || p.parsed.characters.some(c => !(p.cast[c.key] && p.cast[c.key][eng]))) {
-      const opts = S.voiceCache[eng] || (S.voiceCache[eng] = await voiceOptions(eng).catch(() => []));
+    const opts = S.voiceCache[eng] || (S.voiceCache[eng] = await voiceOptions(eng).catch(() => []));
+    const ids = new Set(opts.map(o => o.id));
+    const missing = !p.cast || p.parsed.characters.some(c => !(p.cast[c.key] && p.cast[c.key][eng]));
+    // Stimmen, die es auf diesem Gerät nicht gibt (z. B. nach „Sicherung laden“ auf dem Handy)
+    const foreign = opts.length > 0 && !!p.cast && Object.values(p.cast).some(e => e && e[eng] && e[eng].voiceId && !ids.has(e[eng].voiceId));
+    if (missing || foreign) {
       autoAssign(p, eng, opts);
       await saveProject(p);
     }
@@ -1063,7 +1067,7 @@ async function showSettings() {
           </div>
           <div class="btn-row">
             <button class="btn secondary" data-action="exportAll">${icon.download} Alle Stücke sichern</button>
-            <label class="btn secondary" style="position:relative">Sicherung laden<input type="file" accept=".json,application/json" data-change="importAll" style="position:absolute;inset:0;opacity:0"></label>
+            <label class="btn secondary" style="position:relative">Sicherung laden<input type="file" data-change="importAll" style="position:absolute;inset:0;opacity:0"></label>
           </div>
         </section>
 
@@ -1079,7 +1083,8 @@ async function showSettings() {
       piperBase: (el) => { s.piperBaseUrl = el.value.trim() || 'https://huggingface.co/rhasspy/piper-voices/resolve/main/'; setPiperBase(s.piperBaseUrl); saveSettings(s); },
       importAll: async (el) => {
         const f = el.files && el.files[0]; if (!f) return;
-        const data = JSON.parse(await f.text());
+        let data = null;
+        try { data = JSON.parse(await f.text()); } catch (e) { /* keine JSON-Datei */ }
         if (!data || data.app !== 'souffleuse' || !Array.isArray(data.projects)) throw new Error('Das ist keine Souffleuse-Sicherung.');
         for (const pr of data.projects) {
           if (pr.scriptText) { pr.parsed = parseScript(pr.scriptText); pr.parsedWith = PARSER_VERSION; }
@@ -1120,7 +1125,8 @@ async function showSettings() {
       },
       exportAll: async () => {
         const all = await projects.all();
-        download(new Blob([JSON.stringify({ app: 'souffleuse', version: 1, projects: all.map(stripProject) })], { type: 'application/json' }), 'souffleuse-sicherung.json');
+        const day = new Date().toISOString().slice(0, 10);
+        download(new Blob([JSON.stringify({ app: 'souffleuse', version: 1, projects: all.map(stripProject) })], { type: 'application/json' }), `souffleuse-sicherung-${day}.json`);
       },
     },
   });
@@ -1146,6 +1152,8 @@ function showHelp() {
           <p class="lede">„Ganzes Stück anhören“ unter Szenen liest alle Rollen vor, auch deine, und geht automatisch zur nächsten Szene. Ideal, um das Stück erst einmal kennenzulernen.</p></section>
         <section class="section"><h2>Unterwegs hören</h2>
           <p class="lede">Mit Offline-KI oder Gemini kannst du eine Szene als MP3 speichern. Die läuft auch bei gesperrtem Bildschirm – in jeder Musik- oder Podcast-App.</p></section>
+        <section class="section"><h2>Auf ein anderes Gerät übertragen</h2>
+          <p class="lede">Alles wird nur im Browser gespeichert, in dem du es angelegt hast. Zum Übertragen: Einstellungen → „Alle Stücke sichern“. Die Datei schickst du dir aufs Handy und lädst sie dort unter Einstellungen → „Sicherung laden“. Auf dem iPhone die App vorher zum Home-Bildschirm hinzufügen und die Sicherung dort laden, weil die Home-Bildschirm-App einen eigenen Speicher hat.</p></section>
         <section class="section"><h2>Tipps</h2>
           <p class="lede">Erkennt die App Namen nicht richtig? Unter „Skript“ kannst du alles korrigieren: eine Zeile pro Replik im Muster <span class="kbd">NAME: Text</span>. Auf dem iPhone klingen die Offline-KI- oder Gemini-Stimmen deutlich natürlicher als die eingebauten.</p></section>
       </div>`,
