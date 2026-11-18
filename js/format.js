@@ -81,6 +81,22 @@ export function splitInlineDirections(text) {
   return { spoken, notes };
 }
 
+// Reicht die Klammer am Zeilenanfang über die ganze Zeile?
+// true = ganze Zeile, false = danach folgt noch Text, null = schließt nicht in dieser Zeile
+function leadingParen(t) {
+  const open = t[0], close = open === '[' ? ']' : ')';
+  let depth = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === open) depth++;
+    else if (t[i] === close && --depth === 0) return t.slice(i + 1).trim() === '';
+  }
+  return null;
+}
+// Zeilenanfang einer Replik in GROSSBUCHSTABEN („ANNA:“, „♪ MAX [froh]:“) – beendet mehrzeilige Klammern
+const SPEECH_START = /^\s*[♪♫]?\s*\p{Lu}[\p{Lu}\p{M}\p{N} .'’\-&/+]{0,44}\s*(?:\[[^\]]*\])?\s*:/u;
+
+export const PARSER_VERSION = 2;
+
 function parseEmotion(raw) {
   if (!raw) return { emotion: '', delivery: '' };
   const parts = String(raw).split('|');
@@ -194,20 +210,30 @@ export function parseScript(text) {
       continue;
     }
     if ((m = t.match(HEADING_ACT))) {
-      actTitle = m[1].trim(); scene = null; current = null;
+      const title = m[1].trim();
+      current = null;
+      // derselbe Akt noch einmal (z. B. am Anfang von „Teil 2“) → laufende Szene geht weiter
+      if (title === actTitle && scene) continue;
+      actTitle = title; scene = null;
       continue;
     }
 
-    // Regieanweisung: ganze Zeile in Klammern
-    if (/^[([]/u.test(t) && !SPEECH.test(t.replace(/^[([][^)\]]*[)\]]\s*/u, 'X:'))) {
+    // Regieanweisung: Zeile beginnt mit einer Klammer.
+    // „(zögert) und dann …“ mitten in einer Replik bleibt Fortsetzung der Replik.
+    const paren = /^[([]/u.test(t) ? leadingParen(t) : undefined;
+    if (paren === true || paren === null || (paren === false && !current)) {
       let body = t;
-      // mehrzeilige Klammer zusammensammeln
-      if (!/[)\]]\s*$/u.test(body)) {
+      if (paren === null) {
+        // mehrzeilige Klammer zusammensammeln, bis sie sich schließt (höchstens 12 Zeilen)
         let j = i + 1;
-        while (j < lines.length && lines[j].trim() && !/[)\]]\s*$/u.test(body) && j - i < 12) { body += ' ' + lines[j].trim(); j++; }
+        while (j < lines.length && j - i < 12 && leadingParen(body) === null) {
+          const next = lines[j].trim();
+          if (!next || HEADING_ACT.test(next) || HEADING_SCENE.test(next) || CHAR_DEF.test(next) || SPEECH_START.test(next)) break;
+          body += ' ' + next; j++;
+        }
         i = j - 1;
       }
-      const inner = body.replace(/^[([]\s*/u, '').replace(/\s*[)\]]\s*$/u, '').trim();
+      const inner = leadingParen(body) === false ? body : body.replace(/^[([]\s*/u, '').replace(/\s*[)\]]\s*$/u, '').trim();
       pushLine({ kind: 'direction', text: inner, spoken: inner, speakers: [], speakerKey: null, song: SONG_MARK.test(inner) });
       current = null;
       continue;

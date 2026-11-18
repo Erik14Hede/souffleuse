@@ -1,6 +1,6 @@
 // Souffleuse – Haupt-App: Ansichten, Navigation, Bedienung
 import { projects, clips, loadSettings, saveSettings, requestPersistence, storageEstimate, uid, kv } from './store.js';
-import { parseScript, rawToScript, segmentRaw, characterSummary, normalizeKey, isMine } from './format.js';
+import { parseScript, rawToScript, segmentRaw, characterSummary, normalizeKey, isMine, PARSER_VERSION } from './format.js';
 import { fileToText } from './importers.js';
 import { buildPrompt, structureWithGemini, structurePdfWithGemini } from './ai.js';
 import { deviceEngine } from './engines/device.js';
@@ -12,7 +12,7 @@ import { DEMO_TITLE, DEMO_SCRIPT } from './demo.js';
 import { MASTER_RATE, wavBlob } from './audio.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.0.5';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
@@ -84,7 +84,8 @@ async function loadProject(id) {
   if (S.project && S.project.id === id) return S.project;
   const p = await projects.get(id);
   if (!p) throw new Error('Stück nicht gefunden.');
-  if (!p.parsed && p.scriptText) p.parsed = parseScript(p.scriptText);
+  // nach Parser-Verbesserungen gespeicherte Stücke neu einlesen
+  if (p.scriptText && (!p.parsed || p.parsedWith !== PARSER_VERSION)) { p.parsed = parseScript(p.scriptText); p.parsedWith = PARSER_VERSION; }
   p.play = { ...DEFAULT_PLAY, ...(p.play || {}) };
   p.engine = p.engine || S.settings.defaultEngine || 'device';
   p.myRoles = p.myRoles || [];
@@ -96,6 +97,7 @@ async function saveProject(p) { await projects.put(p); S.project = p; }
 function applyScript(p, text) {
   p.scriptText = text;
   p.parsed = parseScript(text);
+  p.parsedWith = PARSER_VERSION;
   const keys = new Set(p.parsed.characters.map(c => c.key));
   p.myRoles = (p.myRoles || []).filter(k => keys.has(k));
   return p.parsed;
@@ -1080,7 +1082,7 @@ async function showSettings() {
         const data = JSON.parse(await f.text());
         if (!data || data.app !== 'souffleuse' || !Array.isArray(data.projects)) throw new Error('Das ist keine Souffleuse-Sicherung.');
         for (const pr of data.projects) {
-          if (pr.scriptText) pr.parsed = parseScript(pr.scriptText);
+          if (pr.scriptText) { pr.parsed = parseScript(pr.scriptText); pr.parsedWith = PARSER_VERSION; }
           await projects.put(pr);
         }
         toast(`${plural(data.projects.length, 'Stück', 'Stücke')} geladen.`);

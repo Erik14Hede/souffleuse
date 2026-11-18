@@ -3,6 +3,12 @@ import { GeminiError, quotaInfo } from './engines/gemini.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
+// „1. Akt (Teil 2)“ usw. – Fortsetzung eines geteilten Akts
+function continues(part) {
+  const m = String(part || '').match(/\(Teil (\d+)\)\s*$/u);
+  return !!m && Number(m[1]) > 1;
+}
+
 export function buildPrompt({ text, knownCharacters = '', part = '', isPdf = false, pageHint = '' }) {
   return `Du bist Dramaturg:in und bereitest ein Theater- oder Musical-Skript für eine Vorlese-App auf, mit der eine Darstellerin ihren Text lernt.
 Wandle ${isPdf ? 'die angehängte PDF' + (pageHint ? ' (nur ' + pageHint + ')' : '') : 'den Text unten'} in das „Souffleuse-Format“ um.
@@ -23,7 +29,7 @@ REGELN
 5. Gesungene Zeilen (Lieder) mit ♪ am Zeilenanfang: ♪ ANNA [sehnsüchtig | longing]: Text
    Mehrere Figuren gleichzeitig: ANNA & MAX: …   Chor/alle: ALLE: …
 6. Gib NUR das Ergebnis aus – keine Einleitung, keine Erklärungen, kein Markdown-Codeblock.
-${knownCharacters ? `\nBEREITS BEKANNTE FIGUREN (genau diese Namen verwenden, nur neue Figuren mit @ ergänzen):\n${knownCharacters}\n` : ''}${part ? `\nABSCHNITT: ${part}\n` : ''}
+${knownCharacters ? `\nBEREITS BEKANNTE FIGUREN (genau diese Namen verwenden, nur neue Figuren mit @ ergänzen):\n${knownCharacters}\n` : ''}${part ? `\nABSCHNITT: ${part}\n` : ''}${continues(part) ? 'Dieser Teil setzt den vorherigen nahtlos fort: Beginne NICHT mit einer eigenen Akt- oder Szenenüberschrift, übernimm nur Überschriften, die im Text stehen.\n' : ''}
 BEISPIEL
 @ LENA: weiblich, Mitte 20, träumerisch und dickköpfig
 @ JONAS: männlich, Ende 20, ihr Bruder, gutmütig
