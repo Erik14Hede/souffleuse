@@ -5,7 +5,7 @@ import { fileToText } from './importers.js';
 import { buildPrompt, structureWithGemini, structurePdfWithGemini } from './ai.js';
 import { deviceEngine } from './engines/device.js';
 import { piperEngine, setPiperBase } from './engines/piper.js';
-import { geminiEngine, GEMINI_TTS_MODELS, geminiRequestsToday } from './engines/gemini.js';
+import { geminiEngine, GEMINI_TTS_MODELS, geminiRequestsToday, resetGeminiQuota } from './engines/gemini.js';
 import { voiceOptions, autoAssign, assignment, NARRATOR } from './cast.js';
 import { Player, MODES, DEFAULT_PLAY, renderScene, missingClips, unlockAudio, ClipProvider, getAudioEl } from './player.js';
 import { DEMO_TITLE, DEMO_SCRIPT } from './demo.js';
@@ -13,7 +13,7 @@ import { MASTER_RATE, wavBlob } from './audio.js';
 import { buildBackup, readBackup } from './backup.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.8';
+const APP_VERSION = '1.0.9';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
@@ -1080,7 +1080,7 @@ async function showSettings() {
         </section>
       </div>`,
     changes: {
-      gkey: (el) => { s.geminiKey = el.value.trim(); saveSettings(s); toast('Schlüssel gespeichert.'); },
+      gkey: (el) => { s.geminiKey = el.value.trim(); saveSettings(s); resetGeminiQuota(); toast('Schlüssel gespeichert.'); },
       ttsModel: (el) => { s.geminiTtsModel = el.value; saveSettings(s); },
       textModel: (el) => { s.geminiTextModel = el.value.trim() || 'gemini-flash-latest'; saveSettings(s); },
       bundle: (el) => { s.geminiBundle = el.checked; saveSettings(s); },
@@ -1115,6 +1115,7 @@ async function showSettings() {
         if (!s.geminiKey) return toast('Bitte zuerst einen Schlüssel eintragen.', { error: true });
         unlockAudio();
         el.disabled = true; el.textContent = 'Teste …';
+        resetGeminiQuota();
         try {
           const r = await geminiEngine.synthesize({ text: 'Hallo! Die Stimme funktioniert.', voiceId: 'Kore', style: 'friendly, warm', apiKey: s.geminiKey, model: s.geminiTtsModel, minIntervalMs: 0 });
           const a = getAudioEl(); a.onended = null; a.ontimeupdate = null; a.src = URL.createObjectURL(wavBlob(r.pcm, r.sampleRate)); a.playbackRate = 1; a.play().catch(() => {});

@@ -31,10 +31,15 @@ const FREE_TTS_MODELS = ['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts', 'g
 const EXHAUSTED_KEY = 'souffleuse.gemini.exhausted';
 function pacificDay() { return new Date(Date.now() - 8 * 3600 * 1000).toISOString().slice(0, 10); } // Kontingente starten um Mitternacht (Pazifikzeit) neu
 function exhaustedMap() { try { return JSON.parse(localStorage.getItem(EXHAUSTED_KEY) || '{}'); } catch (e) { return {}; } }
-function markExhausted(model) { try { const m = exhaustedMap(); m[model] = pacificDay(); localStorage.setItem(EXHAUSTED_KEY, JSON.stringify(m)); } catch (e) { /* */ } }
+// Merkt sich ein leeres Kontingent nur 20 Minuten – danach wird wieder gefragt
+// (z. B. nachdem die Abrechnung aktiviert wurde oder um 9 Uhr deutscher Zeit das neue Kontingent da ist)
+const EXHAUSTED_MS = 20 * 60 * 1000;
+function markExhausted(model) { try { const m = exhaustedMap(); m[model] = Date.now(); localStorage.setItem(EXHAUSTED_KEY, JSON.stringify(m)); } catch (e) { /* */ } }
+export function resetGeminiQuota() { try { localStorage.removeItem(EXHAUSTED_KEY); } catch (e) { /* */ } }
 function modelChain(model) {
-  const today = pacificDay(); const ex = exhaustedMap();
-  return [model, ...FREE_TTS_MODELS.filter(m => m !== model)].filter(m => ex[m] !== today);
+  const ex = exhaustedMap(); const now = Date.now();
+  const fresh = (m) => !(typeof ex[m] === 'number' && now - ex[m] < EXHAUSTED_MS && pacificDay() === new Date(ex[m] - 8 * 3600 * 1000).toISOString().slice(0, 10));
+  return [model, ...FREE_TTS_MODELS.filter(m => m !== model)].filter(fresh);
 }
 async function withModelFallback(model, run) {
   let lastErr = null;
@@ -47,7 +52,7 @@ async function withModelFallback(model, run) {
       throw e;
     }
   }
-  throw lastErr || new GeminiError('quota', 'Das kostenlose Gemini-Tageskontingent ist für heute aufgebraucht. Bereits erzeugte Zeilen bleiben gespeichert – morgen geht es weiter (oder wechsle zu „Offline-KI“).', 429);
+  throw lastErr || new GeminiError('quota', 'Das kostenlose Gemini-Tageskontingent ist für heute aufgebraucht. Bereits erzeugte Zeilen bleiben gespeichert. Das neue Kontingent kommt um 9 Uhr – oder wechsle zu „Offline-KI“. Hast du gerade die Abrechnung aktiviert, tippe unter Einstellungen → Gemini auf „Schlüssel testen“.', 429);
 }
 
 let lastCall = 0;
@@ -233,6 +238,7 @@ export const geminiEngine = {
 
   // Schlüssel testen (eine kurze Anfrage)
   async test({ apiKey, model }) {
+    resetGeminiQuota();
     const r = await this.synthesize({ text: 'Hallo! Die Stimme funktioniert.', voiceId: 'Kore', style: 'friendly', apiKey, model, minIntervalMs: 0 });
     return r.pcm.length / r.sampleRate;
   },

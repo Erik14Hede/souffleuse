@@ -1,5 +1,5 @@
 /* Souffleuse – Service Worker: App offline verfügbar machen */
-const VERSION = '1.0.8';
+const VERSION = '1.0.9';
 const APP_CACHE = 'souffleuse-app-' + VERSION;
 const LIB_CACHE = 'souffleuse-lib-v1';
 
