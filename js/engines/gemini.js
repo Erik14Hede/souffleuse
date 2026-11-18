@@ -52,7 +52,11 @@ async function withModelFallback(model, run) {
 
 let lastCall = 0;
 let chain = Promise.resolve();
-const legacyModels = new Set(); // Modelle, die speech_metadata nicht kennen
+// Modelle, die speech_metadata nicht kennen – gemerkt, damit nicht jedes Mal eine Anfrage verloren geht
+const LEGACY_KEY = 'souffleuse.gemini.legacyModels';
+const legacyModels = new Set((() => { try { return JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]'); } catch (e) { return []; } })());
+const legacyAdd = legacyModels.add.bind(legacyModels);
+legacyModels.add = (m) => { legacyAdd(m); try { localStorage.setItem(LEGACY_KEY, JSON.stringify([...legacyModels])); } catch (e) { /* egal */ } return legacyModels; };
 export const geminiStats = { requests: 0, today: 0, day: new Date().toDateString() };
 
 function countRequest() {
@@ -102,7 +106,7 @@ function mapError(status, body) {
   if (status === 400 && /api key/i.test(msg)) return new GeminiError('key', 'Der Gemini-Schlüssel ist ungültig. Bitte in den Einstellungen prüfen.', status);
   if (status === 401 || status === 403) return new GeminiError('key', 'Zugriff verweigert – stimmt der Gemini-Schlüssel? (' + (msg || status) + ')', status);
   if (status === 404) return new GeminiError('model', 'Dieses Gemini-Modell gibt es nicht (mehr). Bitte in den Einstellungen ein anderes wählen.', status);
-  if (status === 400 && /(speech_metadata|speechMetadata|Unknown name|Invalid JSON payload)/i.test(msg)) return new GeminiError('format', msg, status);
+  if (status === 400 && /(speech[ _]?metadata|Unknown name|Invalid JSON payload)/i.test(msg)) return new GeminiError('format', msg, status);
   if (status >= 500) return new GeminiError('server', 'Gemini ist gerade überlastet. Bitte gleich nochmal versuchen.', status);
   return new GeminiError('other', 'Gemini-Fehler: ' + (msg || status), status);
 }
