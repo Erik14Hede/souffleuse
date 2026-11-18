@@ -12,7 +12,7 @@ import { DEMO_TITLE, DEMO_SCRIPT } from './demo.js';
 import { MASTER_RATE, wavBlob } from './audio.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
@@ -429,8 +429,14 @@ async function showProject(id, tab) {
   const subFn = () => { const roles = roleNames(p); return roles.length ? `Du spielst ${joinNames(roles)}` : 'Noch keine Rolle gewählt'; };
 
   let bodyFn = () => '';
+  S.listenAll = false; // „Ganzes Stück anhören“ endet, sobald man zur Übersicht zurückkehrt
   const actions = {
     menu: () => projectMenu(p),
+    listenAll: () => {
+      unlockAudio();
+      S.listenAll = true; S.autoStart = true;
+      go(`#/s/${p.id}/szene/${p.parsed.scenes[0].id}`);
+    },
   };
   const changes = {}; const inputs = {};
   let mounted = null;
@@ -456,6 +462,7 @@ async function showProject(id, tab) {
     const rows = groups.map(g => `${g.act ? `<h3 class="act-title">${esc(g.act)}</h3>` : ''}<ul class="list">${g.scenes.map(sceneRow).join('')}</ul>`).join('');
     return `<div class="page">
       ${my.length ? '' : `<div class="notice">Wähle zuerst deine Rolle, damit die App weiß, wo sie Pausen für dich lassen soll. <a href="#/s/${p.id}/rollen">Rolle wählen</a></div>`}
+      ${p.parsed.scenes.length ? `<div class="btn-row" style="margin:${my.length ? 0 : 14}px 0 14px"><button class="btn secondary block" data-action="listenAll">${icon.play.replace('<svg', '<svg width="18" height="18"')} Ganzes Stück anhören</button></div>` : ''}
       <p class="meta" style="margin:${my.length ? 0 : 14}px 0 12px">Stimmen: ${ENGINE_LABEL[engine()]}. <a href="#/s/${p.id}/rollen">Ändern</a></p>
       ${rows}
       ${p.parsed.scenes.length ? '' : '<div class="empty"><p>Keine Szenen gefunden. Prüfe das Skript.</p></div>'}
@@ -702,6 +709,8 @@ async function showPlayer(id, sid) {
   const scene = p.parsed.scenes.find(s => s.id === sid);
   if (!scene) return go(`#/s/${id}`);
   const sceneIdx = p.parsed.scenes.indexOf(scene);
+  const cfg = () => S.listenAll ? { ...p.play, mode: 'all', cuesOnly: false, hideMine: false, autoNext: true } : p.play;
+  const autoStart = !!S.autoStart; S.autoStart = false;
   let player = null;
   let wakeLock = null;
   let revealed = new Set();
@@ -719,12 +728,19 @@ async function showPlayer(id, sid) {
   function makePlayer() {
     if (player) player.stop();
     player = new Player({
-      project: p, scene, settings: S.settings, play: p.play, engineId: p.engine,
+      project: p, scene, settings: S.settings, play: cfg(), engineId: p.engine,
       on: {
         line: (ln, kind) => markLine(ln, kind),
         state: (s, extra) => setState(s, extra),
         reveal: (ln) => { revealed.add(ln.id); const el = lineEl(ln.id); if (el) el.classList.remove('covered'); },
-        done: () => { releaseWake(); },
+        done: () => {
+          releaseWake();
+          const next = p.parsed.scenes[sceneIdx + 1];
+          if (cfg().autoNext && next && view && view.isPlayer) {
+            setStatus(`Weiter mit „${esc(next.title)}“ …`);
+            setTimeout(() => { if (view && view.isPlayer && player && player.state === 'done') { S.autoStart = true; go(`#/s/${p.id}/szene/${next.id}`); } }, 1500);
+          }
+        },
         error: (e) => { toast(e.message || String(e), { error: true, ms: 7000 }); releaseWake(); },
         download: (f) => setStatus(`Stimme wird geladen: <b>${Math.round(f * 100)} %</b>`),
         blocked: () => toast('Tippe auf ▶, um die Wiedergabe zu starten.'),
@@ -734,12 +750,12 @@ async function showPlayer(id, sid) {
 
   const lineHtml = (ln) => {
     const cls = ['ln'];
-    const mine = isMine(ln, p.myRoles, p.play.includeEnsemble);
+    const mine = isMine(ln, p.myRoles, cfg().includeEnsemble);
     if (ln.kind === 'direction') cls.push('dir');
     if (mine) cls.push('mine');
-    if (mine && p.play.hideMine && !revealed.has(ln.id)) cls.push('covered');
+    if (mine && cfg().hideMine && !revealed.has(ln.id)) cls.push('covered');
     if (ln.song) cls.push('song');
-    if (ln.song && p.play.songs === 'skip') cls.push('skipped');
+    if (ln.song && cfg().songs === 'skip') cls.push('skipped');
     const text = esc(ln.text).replace(/\(([^()]{1,200})\)/g, '<span class="note">($1)</span>');
     if (ln.kind === 'direction') return `<p class="${cls.join(' ')}" data-line="${ln.id}" data-action="line">${text}</p>`;
     const names = ln.speakers.map(k => (p.parsed.characters.find(c => c.key === k) || { name: k }).name);
@@ -787,9 +803,10 @@ async function showPlayer(id, sid) {
     updateMediaSession(s);
   }
   function statusIdle(running) {
-    const m = MODES[p.play.mode];
+    const m = MODES[cfg().mode];
+    if (S.listenAll) return running ? 'Ganzes Stück: alle Rollen, Szene für Szene' : 'Ganzes Stück anhören: alle Rollen, danach automatisch die nächste Szene.';
     if (!p.myRoles.length) return 'Keine eigene Rolle gewählt – alles wird vorgelesen.';
-    return running ? `${esc(m.label)}${p.play.cuesOnly ? ', nur Stichworte' : ''}` : `${esc(m.hint)}`;
+    return running ? `${esc(m.label)}${cfg().cuesOnly ? ', nur Stichworte' : ''}` : `${esc(m.hint)}`;
   }
 
   async function requestWake() {
@@ -816,7 +833,7 @@ async function showPlayer(id, sid) {
     player.start(index == null ? player.i : index);
   }
 
-  const modeLabel = () => MODES[p.play.mode].label + (p.play.cuesOnly ? ', nur Stichworte' : '');
+  const modeLabel = () => S.listenAll ? 'Ganzes Stück anhören' : MODES[p.play.mode].label + (p.play.cuesOnly ? ', nur Stichworte' : '');
   const speedLabel = () => `${String(p.play.speed).replace('.', ',')}×`;
 
   await prepareCast();
@@ -843,9 +860,11 @@ async function showPlayer(id, sid) {
           <button class="icon-btn" data-action="next" aria-label="Nächste Zeile">${icon.next}</button>
         </div>
       </div></div>`,
+    isPlayer: true,
     mounted() {
       document.documentElement.style.setProperty('--deck-h', (document.querySelector('.deck').offsetHeight) + 'px');
       updateMediaSession('idle');
+      if (autoStart) setTimeout(() => { if (view && view.isPlayer) startFrom(0); }, 250);
     },
     destroy() { if (player) player.stop(); releaseWake(); clearInterval(countdown); },
     actions: {
@@ -900,13 +919,14 @@ async function showPlayer(id, sid) {
       <label class="switch"><span class="label">Meinen Text verdecken<small>Zum Abfragen. Tippe auf eine Zeile, um zu spicken.</small></span><input type="checkbox" data-change="hideMine" ${pl.hideMine ? 'checked' : ''}></label>
       ${pl.mode === 'pause' || pl.mode === 'reveal' ? `<label class="switch"><span class="label">Kurzer Ton vor meinem Einsatz</span><input type="checkbox" data-change="beep" ${pl.beep ? 'checked' : ''}></label>` : ''}
       ${pl.mode === 'tap' ? `<label class="switch"><span class="label">Nach „Weiter“ meinen Satz vorlesen</span><input type="checkbox" data-change="revealAfterTap" ${pl.revealAfterTap ? 'checked' : ''}></label>` : ''}
+      <label class="switch"><span class="label">Danach automatisch die nächste Szene</span><input type="checkbox" data-change="autoNext" ${pl.autoNext ? 'checked' : ''}></label>
       <label class="switch"><span class="label">Regieanweisungen vorlesen</span><input type="checkbox" data-change="directions" ${pl.directions ? 'checked' : ''}></label>
       <label class="switch"><span class="label">Lieder überspringen<small>Gesungene Zeilen werden weder vorgelesen noch abgefragt.</small></span><input type="checkbox" data-change="songsSkip" ${pl.songs === 'skip' ? 'checked' : ''}></label>
       ${pl.mode === 'pause' || pl.mode === 'reveal' ? `<div class="field"><span>Länge meiner Pausen</span><div class="range-row"><input type="range" min="0.8" max="2.5" step="0.1" value="${pl.pauseFactor}" data-input="pauseFactor"><output id="pfOut">${String(pl.pauseFactor).replace('.', ',')}×</output></div></div>` : ''}
       <div class="field"><span>Stimmen</span><div class="seg">${['device', 'piper', 'gemini'].map(k => `<button aria-pressed="${p.engine === k}" data-action="engine" data-engine="${k}">${ENGINE_SHORT[k]}</button>`).join('')}</div></div>
       <div class="btn-row"><button class="btn block" data-action="done">Fertig</button></div>`;
     const redraw = () => { const sh = document.querySelector('.sheet'); if (sh) sh.innerHTML = '<div class="grip"></div>' + html(); };
-    const save = async () => { await saveProject(p); rebuild(); };
+    const save = async () => { S.listenAll = false; await saveProject(p); rebuild(); };
     openSheet(html(), {
       changes: {
         mode: async (el) => { pl.mode = el.value; await save(); redraw(); },
@@ -915,6 +935,7 @@ async function showPlayer(id, sid) {
         beep: async (el) => { pl.beep = el.checked; await save(); },
         revealAfterTap: async (el) => { pl.revealAfterTap = el.checked; await save(); },
         directions: async (el) => { pl.directions = el.checked; await save(); },
+        autoNext: async (el) => { pl.autoNext = el.checked; await save(); },
         songsSkip: async (el) => { pl.songs = el.checked ? 'skip' : 'speak'; await save(); },
       },
       inputs: {
@@ -939,13 +960,13 @@ async function showPlayer(id, sid) {
     if (eng === 'device') {
       info = `<div class="notice">Mit Handy-Stimmen kann der Browser leider keine Audiodatei aufnehmen. Wechsle unter <b>Lernmodus → Stimmen</b> zu „Offline-KI“ oder „Gemini“.</div>`;
     } else {
-      const m = await missingClips({ project: p, scene, settings: S.settings, play: p.play, engineId: eng });
+      const m = await missingClips({ project: p, scene, settings: S.settings, play: cfg(), engineId: eng });
       info = eng === 'gemini' && m.missing ? `<p class="hint">Dafür sind noch etwa ${plural(m.missing, 'Gemini-Anfrage', 'Gemini-Anfragen')} nötig. Bereits erzeugte Zeilen werden wiederverwendet.</p>` : (m.missing ? `<p class="hint">${plural(m.missing, 'Zeile wird', 'Zeilen werden')} noch erzeugt – das dauert einen Moment.</p>` : '');
     }
-    const mode = p.play.mode === 'tap' ? 'reveal' : p.play.mode;
+    const mode = cfg().mode === 'tap' ? 'reveal' : cfg().mode;
     const { el, close } = openSheet(`
       <h2>Szene als Audiodatei</h2>
-      <p class="lede">Zum Hören unterwegs, auch bei gesperrtem Bildschirm. Enthalten: ${esc(MODES[mode].label)}${p.play.cuesOnly ? ', nur Stichworte' : ''}${p.play.mode === 'tap' ? ' (statt „Warten bis ich tippe“)' : ''}.</p>
+      <p class="lede">Zum Hören unterwegs, auch bei gesperrtem Bildschirm. Enthalten: ${esc(MODES[mode].label)}${cfg().cuesOnly ? ', nur Stichworte' : ''}${cfg().mode === 'tap' ? ' (statt „Warten bis ich tippe“)' : ''}.</p>
       ${info}
       <div id="expState"></div>
       <div class="btn-row"><button class="btn block" data-action="make" ${eng === 'device' ? 'disabled' : ''}>Audiodatei erstellen</button></div>`, {
@@ -955,7 +976,7 @@ async function showPlayer(id, sid) {
           const box = document.getElementById('expState');
           try {
             const r = await renderScene({
-              project: p, scene, settings: S.settings, play: p.play, engineId: eng,
+              project: p, scene, settings: S.settings, play: cfg(), engineId: eng,
               onProgress: (f, ln, phase) => { box.innerHTML = `<p class="hint">${phase === 'encode' ? 'MP3 wird erstellt …' : `Zeilen werden erzeugt: ${Math.round(f * 100)} %`}</p><div class="progress"><i style="width:${Math.round(f * 100)}%"></i></div>`; },
             });
             const name = safeFileName(`${p.title} – ${scene.title}`) + '.mp3';
@@ -1111,6 +1132,8 @@ function showHelp() {
           <p class="lede"><b>Handy</b> geht sofort. <b>Offline-KI</b> klingt natürlicher und braucht einmalig einen Download. <b>Gemini</b> spielt am lebendigsten und braucht einen kostenlosen Schlüssel.</p></section>
         <section class="section"><h2>4. Proben</h2>
           <p class="lede">Öffne eine Szene und tippe auf ▶. Bei deinen Zeilen macht die App Pause – oder wartet, bis du „Weiter“ tippst. Über das Regler-Symbol stellst du Lernmodus, Pausenlänge und Stichwort-Training ein. Tippe auf eine Zeile, um dort einzusteigen.</p></section>
+        <section class="section"><h2>Alles anhören</h2>
+          <p class="lede">„Ganzes Stück anhören“ unter Szenen liest alle Rollen vor, auch deine, und geht automatisch zur nächsten Szene. Ideal, um das Stück erst einmal kennenzulernen.</p></section>
         <section class="section"><h2>Unterwegs hören</h2>
           <p class="lede">Mit Offline-KI oder Gemini kannst du eine Szene als MP3 speichern. Die läuft auch bei gesperrtem Bildschirm – in jeder Musik- oder Podcast-App.</p></section>
         <section class="section"><h2>Tipps</h2>

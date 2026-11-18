@@ -17,7 +17,7 @@ export const MODES = {
   tap: { label: 'Warten bis ich tippe', hint: 'Die App wartet bei deinen Zeilen, bis du auf „Weiter“ tippst.' },
 };
 
-export const DEFAULT_PLAY = { mode: 'pause', cuesOnly: false, hideMine: false, directions: false, songs: 'speak', includeEnsemble: true, pauseFactor: 1.3, speed: 1, beep: true, revealAfterTap: false };
+export const DEFAULT_PLAY = { mode: 'pause', cuesOnly: false, hideMine: false, directions: false, songs: 'speak', includeEnsemble: true, pauseFactor: 1.3, speed: 1, beep: true, revealAfterTap: false, autoNext: false };
 
 // ---------------- Ablaufplan ----------------
 export function pauseSeconds(line, factor = 1.3) {

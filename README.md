@@ -6,6 +6,7 @@ Eine kleine Web-App zum Textlernen für Theater und Musical. Die App liest die R
 - Rollen, Szenen, Lieder und Tonfall erkennen lassen: automatisch, mit Gemini oder mit einem beliebigen Chatbot
 - Eigene Rolle markieren (wie mit Textmarker)
 - Lernmodi: Pause für mich, Pause mit Auflösung, Warten bis ich tippe, nur Stichworte, Text verdecken
+- Ganzes Stück anhören: alle Rollen inklusive der eigenen, automatisch Szene für Szene
 - Drei Stimm-Quellen: Handy-Stimmen, Offline-KI (Piper) und Google Gemini
 - Szenen als MP3 speichern, zum Hören mit gesperrtem Bildschirm
 - Alles bleibt auf dem Gerät. Es gibt keinen Server und kein Konto.
