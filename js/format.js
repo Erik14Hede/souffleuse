@@ -261,7 +261,11 @@ export function parseScript(text) {
 
   const chars = [...characters.values()].sort((a, b) => a.order - b.order);
   const speeches = nonEmpty.reduce((n, s) => n + s.lines.filter(l => l.kind === 'speech').length, 0);
-  if (!speeches) warnings.push('Keine Repliken erkannt. Prüfe, ob Zeilen das Muster „NAME: Text“ haben.');
+  if (!speeches) {
+    warnings.push(characters.size
+      ? 'Bisher sind nur Figuren drin, aber noch keine Repliken. Wenn du das Skript abschnittsweise aufbereitest: Füge auch die Antworten für die Akte ein (Menü ⋯ → Neu aufbereiten – deine bisherigen Antworten bleiben erhalten).'
+      : 'Keine Repliken erkannt. Prüfe, ob Zeilen das Muster „NAME: Text“ haben.');
+  }
   return {
     characters: chars.filter(c => c.count > 0 || c.description),
     scenes: nonEmpty,

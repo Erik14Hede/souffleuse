@@ -12,7 +12,7 @@ import { DEMO_TITLE, DEMO_SCRIPT } from './demo.js';
 import { MASTER_RATE, wavBlob } from './audio.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
@@ -244,7 +244,7 @@ async function showPrepare(id) {
 
   const segList = () => `<ul class="segments">${segments.map((s, i) => {
     const r = st.results[keyOf(s)];
-    const status = r ? `<span class="state-done">${icon.check.replace('<svg', '<svg width="18" height="18" style="vertical-align:-3px"')} fertig</span>` : (s._err ? `<span class="state-err">${esc(s._err)}</span>` : `${fmtNumber(s.text.length)} Zeichen`);
+    const status = r ? `<span class="state-done">${icon.check.replace('<svg', '<svg width="18" height="18" style="vertical-align:-3px"')} fertig</span>` : (s._err ? `<span class="state-err">${esc(s._err)}</span>` : `noch offen, ${fmtNumber(s.text.length)} Zeichen`);
     if (st.method === 'chat') {
       return `<li><span class="s-title">${esc(s.title)}</span><span class="s-meta">${status}</span>
         <span class="s-act"><button class="btn secondary" data-action="copyPrompt" data-i="${i}">${icon.copy} Prompt</button></span>
@@ -283,6 +283,7 @@ async function showPrepare(id) {
         <li>Füge ihn in Claude, ChatGPT oder die Gemini-App ein.</li>
         <li>Kopiere die komplette Antwort und füge sie hier im Feld darunter ein.</li>
       </ol>
+      ${segments.length > 1 ? `<p class="hint"><b>${fmtNumber(segments.filter(x => st.results[keyOf(x)]).length)} von ${fmtNumber(segments.length)}</b> Abschnitten fertig. Bitte alle Abschnitte nacheinander bearbeiten.</p>` : ''}
       ${segList()}
       <div class="btn-row"><button class="btn block" data-action="combine">Ergebnis prüfen</button>
       ${Object.keys(st.results).length ? '<button class="btn quiet" data-action="resetResults">Antworten verwerfen</button>' : ''}</div>`;
@@ -335,6 +336,10 @@ async function showPrepare(id) {
         const v = el.value.trim();
         if (v) st.results[keyOf(s)] = v.replace(/^```[a-z]*\n?|```$/g, '').trim(); else delete st.results[keyOf(s)];
         clearTimeout(el._t); el._t = setTimeout(() => saveProject(p), 600);
+        const meta = el.parentElement && el.parentElement.querySelector('.s-meta');
+        if (meta) meta.innerHTML = v ? '<span class="state-done">fertig</span>' : `noch offen, ${fmtNumber(s.text.length)} Zeichen`;
+        const hint = document.querySelector('#panel .hint b');
+        if (hint && segments.length > 1) hint.textContent = `${segments.filter(x => st.results[keyOf(x)]).length} von ${segments.length}`;
       },
     },
     actions: {
@@ -357,7 +362,9 @@ async function showPrepare(id) {
         document.getElementById('panel').innerHTML = panel();
       },
       combine: async () => {
-        if (!Object.keys(st.results).length) return toast('Füge zuerst mindestens eine Antwort ein.', { error: true });
+        const done = segments.filter(x => st.results[keyOf(x)]).length;
+        if (!done) return toast('Füge zuerst mindestens eine Antwort ein.', { error: true });
+        if (done < segments.length && !confirm(`Erst ${done} von ${segments.length} Abschnitten haben eine Antwort. Trotzdem schon prüfen?\n\nDie übrigen kannst du später ergänzen (Menü ⋯ → Neu aufbereiten).`)) return;
         await finish(combine());
       },
       gemini: async (btn) => {
