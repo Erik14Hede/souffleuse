@@ -95,7 +95,13 @@ function leadingParen(t) {
 // Zeilenanfang einer Replik in GROSSBUCHSTABEN („ANNA:“, „♪ MAX [froh]:“) – beendet mehrzeilige Klammern
 const SPEECH_START = /^\s*[♪♫]?\s*\p{Lu}[\p{Lu}\p{M}\p{N} .'’\-&/+]{0,44}\s*(?:\[[^\]]*\])?\s*:/u;
 
-export const PARSER_VERSION = 2;
+export const PARSER_VERSION = 3;
+
+// Überschriften ohne # (z. B. wenn beim Kopieren aus einem Chat die Markdown-Zeichen verloren gehen).
+// Nur mit Nummer, damit „Szene zwischen Maria und Sunny …“ nicht als Überschrift gilt.
+const ORDW = '(?:erste[rs]?|zweite[rs]?|dritte[rs]?|vierte[rs]?|fünfte[rs]?|letzte[rs]?)';
+const PLAIN_ACT = new RegExp(`^(?:(\\d{1,2})\\.?\\s*|${ORDW}\\s+)(?:akt|aufzug)\\b\\s*[:.–—-]?\\s*(.{0,60})$|^(?:akt|aufzug)\\s+(\\d{1,2}|[IVX]{1,4})\\b\\s*[:.–—-]?\\s*(.{0,60})$`, 'iu');
+const PLAIN_SCENE = /^(?:\d{1,3}\.?\s*(?:szene|bild)\b|(?:szene|bild)\s*\d{1,3}[a-z]?\b).{0,80}$/iu;
 
 function parseEmotion(raw) {
   if (!raw) return { emotion: '', delivery: '' };
@@ -204,6 +210,19 @@ export function parseScript(text) {
     if (CHAR_DEF.test(t)) { current = null; continue; }
 
     let m;
+    if (!t.startsWith('#') && t.length <= 90 && !/^[([♪♫]/u.test(t)) {
+      if (PLAIN_ACT.test(t)) {
+        current = null;
+        if (t === actTitle && scene) continue;
+        actTitle = t; scene = null;
+        continue;
+      }
+      if (PLAIN_SCENE.test(t)) {
+        scene = null; current = null;
+        ensureScene(t);
+        continue;
+      }
+    }
     if ((m = t.match(HEADING_SCENE))) {
       scene = null; current = null;
       ensureScene(m[1].trim() || 'Szene ' + (scenes.length + 1));
