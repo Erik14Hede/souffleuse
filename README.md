@@ -60,7 +60,7 @@ Geänderte Dateien einfach erneut hochladen. Die App holt sich Neuerungen beim n
 
 **Offline-KI** sind die frei verfügbaren deutschen [Piper](https://github.com/rhasspy/piper)-Stimmen. Sie laufen direkt im Browser und werden beim ersten Gebrauch von Hugging Face geladen. Die Männerstimme „Thorsten“ ist die beste. Die Frauenstimmen sind etwas einfacher.
 
-**Gemini** klingt am lebendigsten. Du brauchst dafür einen kostenlosen API-Schlüssel:
+**Gemini** klingt am lebendigsten. Beachte: Laut Googles Bedingungen sind AI Studio und die Gemini-API für Entwickler gedacht, die damit beruflich oder geschäftlich arbeiten, nicht für private Nutzung. Wer das nicht ist, nimmt die Offline-KI-Stimmen und für die Aufbereitung den Chatbot-Weg. Für Gemini brauchst du einen kostenlosen API-Schlüssel:
 
 1. [aistudio.google.com/apikey](https://aistudio.google.com/apikey) öffnen und mit einem Google-Konto anmelden.
 2. „API-Schlüssel erstellen“, kopieren, in der App unter **Einstellungen → Gemini** einfügen.

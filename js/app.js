@@ -12,7 +12,7 @@ import { DEMO_TITLE, DEMO_SCRIPT } from './demo.js';
 import { MASTER_RATE, wavBlob } from './audio.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
@@ -1014,6 +1014,7 @@ async function showSettings() {
         <section class="section">
           <h2>Gemini</h2>
           <p class="lede">Für die natürlichsten Stimmen und die automatische Rollenerkennung. Der Schlüssel ist kostenlos und bleibt nur auf diesem Gerät.</p>
+          <p class="hint">Wichtig: Laut Googles Bedingungen sind AI Studio und die Gemini-API für Entwickler gedacht, die damit beruflich oder geschäftlich arbeiten – nicht für private Nutzung. Trifft das nicht auf dich zu, nimm die Offline-KI-Stimmen und für die Skript-Aufbereitung den Chatbot-Weg.</p>
           <details><summary>So bekommst du einen Schlüssel</summary>
             <ol class="steps">
               <li>Öffne <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> und melde dich mit einem Google-Konto an.</li>
