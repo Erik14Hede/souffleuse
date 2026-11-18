@@ -6,7 +6,7 @@ import { geminiEngine } from './engines/gemini.js';
 import { prosodyFor, styleFor, classifyEmotion } from './emotion.js';
 import { assignment, speakerForLine, NARRATOR } from './cast.js';
 import { clips } from './store.js';
-import { MASTER_RATE, prepareClip, packClip, unpackClip, concat, silence, beep, wavBlob, encodeMp3, hashString } from './audio.js';
+import { MASTER_RATE, prepareClip, packClip, unpackClip, concat, silence, beep, wavBlob, encodeMp3, hashString, alignLineBounds } from './audio.js';
 
 export const ENGINES = { device: deviceEngine, piper: piperEngine, gemini: geminiEngine };
 
@@ -330,11 +330,9 @@ export class Player {
     if (token !== this.token) return;
     this.setState('playing');
     // Zeilen-Markierung innerhalb gebündelter Clips
-    const total = clip.pcm.length / MASTER_RATE;
     const w = clip.weights && clip.weights.length === st.lines.length ? clip.weights : st.lines.map(l => l.spoken.length || 1);
-    const sum = w.reduce((a, b) => a + b, 0);
-    let acc = 0;
-    const bounds = w.map(x => { const s = acc; acc += x; return { start: (s / sum) * total, end: (acc / sum) * total }; });
+    if (!clip.bounds || clip.bounds.length !== w.length) clip.bounds = alignLineBounds(clip.pcm, MASTER_RATE, w);
+    const bounds = clip.bounds;
     await this.playPcm(clip.pcm, token, (t) => {
       const k = bounds.findIndex(b => t >= b.start && t < b.end);
       if (k >= 0) this.emit('line', st.lines[k], isReveal ? 'reveal' : 'say');

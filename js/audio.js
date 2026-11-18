@@ -219,3 +219,61 @@ export function hashString(str) {
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
+
+// Zeilengrenzen in einem gebündelten Clip (mehrere Repliken in einer Aufnahme) finden:
+// Startpunkt ist die Schätzung nach Textlänge, dann wird jede Grenze auf die passendste
+// Sprechpause in ihrer Nähe verschoben. Ergebnis: [{start, end}] in Sekunden.
+export function alignLineBounds(pcm, rate, weights) {
+  const total = pcm.length / rate;
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  let acc = 0;
+  const est = weights.map(w => { acc += w; return (acc / sum) * total; }).slice(0, -1); // erwartete Grenzen
+  if (!est.length) return [{ start: 0, end: total }];
+
+  // Lautstärke in 20-ms-Fenstern
+  const hop = Math.round(rate * 0.02);
+  const rms = [];
+  for (let i = 0; i + hop <= pcm.length; i += hop) {
+    let s = 0; for (let j = i; j < i + hop; j++) s += pcm[j] * pcm[j];
+    rms.push(Math.sqrt(s / hop));
+  }
+  const sorted = rms.slice().sort((a, b) => a - b);
+  const loud = sorted[Math.floor(sorted.length * 0.9)] || 0;
+  const thr = Math.max(0.004, loud * 0.08);
+  // Pausen ≥ 160 ms sammeln
+  const gaps = [];
+  let runStart = -1;
+  for (let k = 0; k <= rms.length; k++) {
+    const quiet = k < rms.length && rms[k] < thr;
+    if (quiet && runStart < 0) runStart = k;
+    if (!quiet && runStart >= 0) {
+      const dur = (k - runStart) * 0.02;
+      if (dur >= 0.16 && runStart > 0 && k < rms.length) gaps.push({ mid: (runStart + k) / 2 * 0.02, dur });
+      runStart = -1;
+    }
+  }
+  // jede Grenze der Reihe nach auf die beste Pause in der Nähe legen
+  const cuts = [];
+  let prev = 0;
+  const window = Math.max(1.5, total / (weights.length + 1));
+  for (let i = 0; i < est.length; i++) {
+    const remaining = est.length - i - 1;
+    let best = null, bestScore = -Infinity;
+    for (const g of gaps) {
+      if (g.mid <= prev + 0.3) continue;
+      // für die restlichen Grenzen muss noch Platz bleiben
+      if (remaining && g.mid > total - remaining * 0.3) continue;
+      const dist = Math.abs(g.mid - est[i]);
+      if (dist > window) continue;
+      const score = g.dur * 2 - dist / window;
+      if (score > bestScore) { bestScore = score; best = g; }
+    }
+    const cut = best ? best.mid : Math.max(prev + 0.3, est[i]);
+    cuts.push(cut); prev = cut;
+  }
+  const out = [];
+  let s = 0;
+  for (const c of cuts) { out.push({ start: s, end: c }); s = c; }
+  out.push({ start: s, end: total });
+  return out;
+}

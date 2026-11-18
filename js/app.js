@@ -13,7 +13,7 @@ import { MASTER_RATE, wavBlob } from './audio.js';
 import { buildBackup, readBackup } from './backup.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.9';
+const APP_VERSION = '1.0.10';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
