@@ -26,7 +26,9 @@ REGELN
    – Den gesprochenen Text WÖRTLICH übernehmen: nichts kürzen, umformulieren oder ergänzen. Nur Seitenzahlen, Kopfzeilen und Trennstriche entfernen.
 4. Regieanweisungen als eigene Zeile in runden Klammern: (Anna geht zum Fenster.)
    Kurze Anweisungen mitten in einer Replik bleiben in Klammern im Text: Ja. (zögert) Vielleicht.
-5. Gesungene Zeilen (Lieder) mit ♪ am Zeilenanfang: ♪ ANNA [sehnsüchtig | longing]: Text
+5. Lieder: Liedtexte NICHT abschreiben. Schreibe stattdessen pro Lied eine Regiezeile mit ♪, Titel und wer singt:
+   (♪ SONG: „Titel“ – Anna und Chor)
+   Gesprochene Sätze mitten im Lied ganz normal als Replik.
    Mehrere Figuren gleichzeitig: ANNA & MAX: …   Chor/alle: ALLE: …
 6. Gib NUR das Ergebnis aus – keine Einleitung, keine Erklärungen, kein Markdown-Codeblock.
 ${knownCharacters ? `\nBEREITS BEKANNTE FIGUREN (genau diese Namen verwenden, nur neue Figuren mit @ ergänzen):\n${knownCharacters}\n` : ''}${part ? `\nABSCHNITT: ${part}\n` : ''}${continues(part) ? 'Dieser Teil setzt den vorherigen nahtlos fort: Beginne NICHT mit einer eigenen Akt- oder Szenenüberschrift, übernimm nur Überschriften, die im Text stehen.\n' : ''}

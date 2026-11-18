@@ -282,7 +282,8 @@ export function parseScript(text) {
       }
     }
   }
-  const nonEmpty = scenes.filter(s => s.lines.some(l => l.kind === 'speech'));
+  // Szenen ohne Repliken fallen weg – außer sie enthalten ein Lied (z. B. reine Song-Szene)
+  const nonEmpty = scenes.filter(s => s.lines.some(l => l.kind === 'speech' || l.song));
   nonEmpty.forEach((s, i) => { s.id = 's' + i; s.lines.forEach((l, j) => { l.id = s.id + '-' + j; l.index = j; }); });
 
   const chars = [...characters.values()].sort((a, b) => a.order - b.order);

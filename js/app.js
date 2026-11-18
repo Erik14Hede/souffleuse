@@ -13,7 +13,7 @@ import { MASTER_RATE, wavBlob } from './audio.js';
 import { buildBackup, readBackup } from './backup.js';
 import { esc, icon, toast, sheet, closeSheet, fmtNumber, fmtBytes, fmtDuration, plural, download, safeFileName, copyText } from './ui.js';
 
-const APP_VERSION = '1.0.10';
+const APP_VERSION = '1.0.11';
 const $app = document.getElementById('app');
 const S = { settings: loadSettings(), project: null, voiceCache: {}, importDraft: null };
 setPiperBase(S.settings.piperBaseUrl);
@@ -466,7 +466,7 @@ async function showProject(id, tab) {
       const ticks = sc.lines.map((l, i) => isMine(l, my, p.play.includeEnsemble) ? `<i style="left:${(i / n * 100).toFixed(2)}%;width:${Math.max(0.8, 100 / n).toFixed(2)}%"></i>` : '').join('');
       return `<li><button class="row" data-action="nav" data-href="#/s/${p.id}/szene/${sc.id}">
         <span class="main"><span class="title">${esc(sc.title)}</span>
-        <span class="sub">${plural(speeches.length, 'Replik', 'Repliken')}${my.length ? `, ${mine.length ? fmtNumber(mine.length) + ' davon deine' : 'du hast hier nichts zu sagen'}` : ''}</span>
+        <span class="sub">${speeches.length ? plural(speeches.length, 'Replik', 'Repliken') : 'Nur Lied, keine Repliken'}${my.length && speeches.length ? `, ${mine.length ? fmtNumber(mine.length) + ' davon deine' : 'du hast hier nichts zu sagen'}` : ''}</span>
         ${my.length && mine.length ? `<span class="scene-map" aria-hidden="true">${ticks}</span>` : ''}</span>${icon.chev}</button></li>`;
     };
     const rows = groups.map(g => `${g.act ? `<h3 class="act-title">${esc(g.act)}</h3>` : ''}<ul class="list">${g.scenes.map(sceneRow).join('')}</ul>`).join('');
